@@ -58,6 +58,8 @@ df_merchant_text = (
     .reset_index()
 )
 
+df_clicks["created_at"] = df_clicks["created_at"].dt.date
+
 
 def make_table(df, page_size=10):
     """
@@ -141,3 +143,63 @@ def make_recommendation_table(user_id):
         )
 
     return table, bar_plot
+
+
+@app.callback(
+    Output("lead-output-table", "children"),
+    [Input("btn-lead-generate", "n_clicks")],
+    prevent_initial_call=True,
+)
+def make_leads_table(n_clicks):
+    if n_clicks:
+        leads_dict = dict()
+        for user_id in model.user_list[:1000]:  # TODO: performance optimization
+            preds = model.generate_predictions(user_id=user_id)
+            if len(preds) == model.num_rec:
+                leads_dict[user_id] = preds
+        df = pd.DataFrame(leads_dict).T.reset_index()
+        df = df.rename(columns={"index": "User Id"})
+        df.columns = [
+            "Lead {}".format(str(col + 1)) if "User" not in str(col) else col
+            for col in df.columns
+        ]
+        table = make_table(df)
+        return table
+
+    else:
+        return None
+
+
+@app.callback(
+    Output("visualization-output", "children"),
+    [Input("merchant-dropdown", "value")],
+    prevent_initial_call=True,
+)
+def make_visualization(merchant_id):
+    if merchant_id:
+        df = (
+            df_clicks.groupby(["merchant_id", "created_at"])["id"]
+            .agg("count")
+            .reset_index()
+            .rename(columns={"id": "click_count"})
+        )
+        df_merchant = df[df["merchant_id"] == merchant_id].copy()
+        fig = px.bar(
+            df_merchant,
+            x="created_at",
+            y="click_count",
+            title="Mechant Clicks Plot",
+            labels={"click_count": "# Clicks", "created_at": "Date"},
+            template="seaborn",
+        )
+        fig.update_layout(uniformtext_minsize=8, uniformtext_mode="hide")
+        fig.update_layout(margin={"l": 5, "b": 75, "t": 25, "r": 0})
+        merchant_plot = dcc.Graph(
+            figure=fig,
+            className="container",
+            style={"maxWidth": "650px", "margin-top": "5rem"},
+        )
+        return merchant_plot
+
+    else:
+        return None
