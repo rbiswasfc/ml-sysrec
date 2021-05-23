@@ -1,5 +1,6 @@
 {
     "data_dir": "./data",
+    "model_path": "./model/merchant2vec.model",
     "test_split_date": "2021-02-28",
     "num_preds": 10
 }
