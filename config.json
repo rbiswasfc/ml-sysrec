@@ -1,0 +1,5 @@
+{
+    "data_dir": "./data",
+    "test_split_date": "2021-02-28",
+    "num_preds": 10
+}

@@ -8,12 +8,12 @@ class DataLoader:
     class to help loading of required data  
     """
 
-    def __init__(self, data_dir="./data"):
+    def __init__(self, data_dir):
         """
         initialize data loader
 
-        :param data_dir: path to data directory, defaults to './data'
-        :type data_dir: str, optional
+        :param data_dir: path to data directory
+        :type data_dir: str
         """
         self.data_dir = data_dir
 
@@ -43,7 +43,7 @@ class DataLoader:
 
 
 if __name__ == "__main__":
-    data_loader = DataLoader()
+    data_loader = DataLoader("./data")
     df_users = data_loader.load_user_data()
     print(df_users.head())
 
