@@ -77,12 +77,14 @@ def make_table(df, page_size=10):
 @app.callback(Output("rec-output-table", "children"), [Input("user-id-input", "value")])
 def make_recommendation_table(user_id):
     if not user_id:
-        return ""
+        return html.Div("")
 
     # get model predictions for this user id
     recs = model.generate_predictions(user_id=user_id)
-    if not isinstance(recs, list):  # exception from model prediction func
-        return html.Div(recs)
+    if len(recs) == 0:  # exception from model prediction func
+        print("not user")
+        return html.Div("")
+
     df = pd.DataFrame()
     df["merchant_id"] = recs
     df["merchant_id"] = df["merchant_id"].astype(int)
@@ -95,7 +97,5 @@ def make_recommendation_table(user_id):
             "display_text": "Display",
         }
     )
-    print(df)
-
     table = make_table(df)
     return table
