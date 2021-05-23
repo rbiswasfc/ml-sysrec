@@ -1,12 +1,4 @@
-from json import load
-from gensim.models.word2vec import LineSentence
-import numpy as np
-import pandas as pd
-import scipy.sparse as sparse
-from sklearn import metrics
-
 from utils import load_config, mapk
-from als_model import implicit_als_cg
 from data_processor import DataProcessor
 from gensim.models import Word2Vec
 
@@ -148,6 +140,7 @@ class Merchant2VecModel:
         """
         try:
             self.model = Word2Vec.load(self.config["model_path"])
+            self.model.init_sims(replace=True)
         except Exception as e:
             print(e)
             print("error in model loading!")
@@ -192,6 +185,7 @@ def build_sys_rec_model():
     """
     build and save the recommender system to be used in production
     """
+    print("building model...")
     model = Merchant2VecModel()
     model.train(final_training=True)
     model.save_model()
