@@ -5,7 +5,7 @@ import pandas as pd
 import scipy.sparse as sparse
 from sklearn import metrics
 
-from utils import load_config
+from utils import load_config, mapk
 from als_model import implicit_als_cg
 from data_processor import DataProcessor
 from gensim.models import Word2Vec
@@ -114,6 +114,10 @@ class Merchant2VecModel:
             return "error! user not found..."
 
         this_user_clicks = self.user_recent_click_dict.get(user_id, [])
+        this_user_clicks = list(map(str, this_user_clicks))
+        this_user_clicks = [
+            m for m in this_user_clicks if m in self.model.wv.index_to_key
+        ]
         # print(this_user_clicks)
 
         click_threshold = 2
@@ -121,7 +125,6 @@ class Merchant2VecModel:
         if len(this_user_clicks) <= click_threshold:
             return self.popular_merchants
 
-        this_user_clicks = list(map(str, this_user_clicks))
         pred_merchants = self.model.wv.most_similar(
             positive=this_user_clicks, topn=self.num_rec
         )
@@ -129,7 +132,8 @@ class Merchant2VecModel:
         return pred_merchants
 
     def generate_batch_predictions(self):
-        pass
+        # TO-DO: vectorization for batch prediction
+        raise NotImplementedError
 
     def save_model(self):
         """
@@ -147,6 +151,50 @@ class Merchant2VecModel:
         except Exception as e:
             print(e)
             print("error in model loading!")
+
+
+def evaluate_model_performance():
+    """
+    evaluate model performance on test data
+    train data: click data in Jan, Feb 2021
+    test data: click data in Mar 2021 
+
+    model performance is assessed by mean average precision at top 5
+    """
+
+    config = load_config()
+    data_processor = DataProcessor()
+    df_test = data_processor.create_user_click_sequence(
+        start_date=config["test_split_date"]
+    )
+    df_test["truths"] = df_test["merchant_seq"].apply(lambda x: list(set(x)))
+    truth_dict = dict(zip(df_test["user_id"], df_test["truths"]))
+
+    # get model
+    print("model training...")
+    model = Merchant2VecModel()
+    model.train()
+
+    # compute mAP@k
+    k = model.num_rec
+    all_truths, all_preds = [], []
+    for user_id, user_merchants in truth_dict.items():
+        this_pred = model.generate_predictions(
+            user_id=user_id, eval_date=config["test_split_date"]
+        )
+        all_truths.append(user_merchants)
+        all_preds.append(this_pred)
+    score = mapk(all_truths, all_preds, k)
+    print("mAP@{} for current model: {:.4f}".format(k, score))
+
+
+def build_sys_rec_model():
+    """
+    build and save the recommender system to be used in production
+    """
+    model = Merchant2VecModel()
+    model.train(final_training=True)
+    model.save_model()
 
 
 # def create_interaction_matrix(df, pur_col="pur_count"):
@@ -242,11 +290,5 @@ class Merchant2VecModel:
 #     print(pop_mean_auc)
 
 if __name__ == "__main__":
-    config = load_config()
-    model = Merchant2VecModel()
-    model.train()
-    preds = model.generate_predictions(
-        user_id=33576, eval_date=config["test_split_date"]
-    )
-    print(preds)
+    evaluate_model_performance()
 
