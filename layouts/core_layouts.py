@@ -21,6 +21,7 @@ def make_predict_page():
             ),
             dcc.Loading(html.Div(id="rec-output-table"), color="black"),
             html.Div("User Past Clicks Plot", className="inline-header col-12"),
+            dcc.Loading(html.Div(id="user-click-plot"), color="black"),
         ],
         style={"textAlign": "center"},
     )

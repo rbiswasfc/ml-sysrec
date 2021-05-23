@@ -103,7 +103,7 @@ class Merchant2VecModel:
             self.popular_merchants = self.get_most_popular_merchants()
 
         if user_id not in self.user_list:
-            return []
+            return [-1]
 
         this_user_clicks = self.user_recent_click_dict.get(user_id, [])
         this_user_clicks = list(map(str, this_user_clicks))

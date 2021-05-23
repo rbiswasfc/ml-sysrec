@@ -1,11 +1,13 @@
 import os
-from pickle import load
 import pandas as pd
 import pdb
 import dash_table
 import dash_html_components as html
+import plotly.express as px
+
 
 from dash.dependencies import Input, Output
+import dash_core_components as dcc
 from app import app, cache
 from utils import load_config
 from data_loader import DataLoader
@@ -32,6 +34,17 @@ model = restore_model()
 # get merchant-store mappings
 data_loader = DataLoader(config["data_dir"])
 df_stores = data_loader.load_store_data()
+df_clicks = data_loader.load_clicks_data()
+df_clicks = df_clicks = pd.merge(
+    df_clicks, df_stores[["store_id", "merchant_id"]], on="store_id", how="left"
+)
+
+df_counts = (
+    df_clicks.groupby(["user_id", "merchant_id"])["id"]
+    .agg("count")
+    .reset_index()
+    .rename(columns={"id": "click_count"})
+)
 
 df_merchant_store = (
     df_stores.groupby("merchant_id")["store_id"]
@@ -74,16 +87,19 @@ def make_table(df, page_size=10):
     return layout
 
 
-@app.callback(Output("rec-output-table", "children"), [Input("user-id-input", "value")])
+@app.callback(
+    [Output("rec-output-table", "children"), Output("user-click-plot", "children")],
+    [Input("user-id-input", "value")],
+)
 def make_recommendation_table(user_id):
     if not user_id:
-        return html.Div("")
+        return html.Div(""), html.Div("")
 
     # get model predictions for this user id
     recs = model.generate_predictions(user_id=user_id)
-    if len(recs) == 0:  # exception from model prediction func
-        print("not user")
-        return html.Div("")
+    # if len(recs) == 0:  # exception from model prediction func
+    #    print("not user")
+    #    return html.Div("")
 
     df = pd.DataFrame()
     df["merchant_id"] = recs
@@ -98,4 +114,30 @@ def make_recommendation_table(user_id):
         }
     )
     table = make_table(df)
-    return table
+
+    # user past behavior
+    df_counts_user = df_counts[df_counts["user_id"] == user_id].copy()
+    df_counts_user["merchant_id"] = df_counts_user["merchant_id"].apply(
+        lambda x: "merchant_{}".format(x)
+    )
+    df_counts_user = df_counts_user.sort_values(by="click_count", ascending=False)
+    if len(df_counts_user) == 0:
+        bar_plot = html.Div("NA")
+    else:
+        top_k = 15
+        df_counts_user = df_counts_user.iloc[:top_k].copy()
+        fig = px.bar(
+            df_counts_user,
+            y="click_count",
+            x="merchant_id",
+            title="User Clicks History",
+            labels={"click_count": "# Clicks", "merchant_id": "Merchant"},
+            template="seaborn",
+        )
+        fig.update_layout(uniformtext_minsize=8, uniformtext_mode="hide")
+        fig.update_layout(margin={"l": 5, "b": 75, "t": 25, "r": 0})
+        bar_plot = dcc.Graph(
+            figure=fig, className="container", style={"maxWidth": "650px"}
+        )
+
+    return table, bar_plot
